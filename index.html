@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-dark.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>Cousera machine learning project by ktansey</title>
+  </head>
+
+  <body>
+    <div id="container">
+      <div class="inner">
+
+        <header>
+          <h1>Cousera machine learning project</h1>
+          <h2></h2>
+        </header>
+
+        <section id="downloads" class="clearfix">
+          <a href="https://github.com/ktansey/Cousera_Machine_Learning/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
+          <a href="https://github.com/ktansey/Cousera_Machine_Learning/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
+          <a href="https://github.com/ktansey/Cousera_Machine_Learning" id="view-on-github" class="button"><span>View on GitHub</span></a>
+        </section>
+
+        <hr>
+
+        <section id="main_content">
+          <hr>
+
+<p>title: "Practical Machine Learning Course Project"</p>
+
+<h2>
+<a id="author-katherine-tansey" class="anchor" href="#author-katherine-tansey" aria-hidden="true"><span class="octicon octicon-link"></span></a>author: "Katherine Tansey"</h2>
+
+<h1>
+<a id="background" class="anchor" href="#background" aria-hidden="true"><span class="octicon octicon-link"></span></a>Background</h1>
+
+<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <a href="http://groupware.les.inf.puc-rio.br/har">http://groupware.les.inf.puc-rio.br/har</a> (see the section on the Weight Lifting Exercise Dataset). </p>
+
+<h1>
+<a id="load-libraries-and-data" class="anchor" href="#load-libraries-and-data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Load libraries and data</h1>
+
+<p>Load the R libraries needed for the analysis.</p>
+
+<pre lang="r,"><code>library(AppliedPredictiveModeling)
+library(caret)
+library(ElemStatLearn) 
+library(pgmm)
+library(rpart) 
+library(e1071)
+library(randomForest)
+library(rpart.plot)         
+library(RColorBrewer)
+library(party)              
+library(partykit)
+
+</code></pre>
+
+<p>Set the seed for the analysis so it can be reproduced. </p>
+
+<div class="highlight highlight-r"><pre>set.seed(<span class="pl-c1">12345</span>)</pre></div>
+
+<p>Load in the data from the web. Check the size of the two datasets. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">trainUrl</span> <span class="pl-k">&lt;-</span> <span class="pl-s"><span class="pl-pds">"</span>http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv<span class="pl-pds">"</span></span>
+<span class="pl-smi">validationUrl</span> <span class="pl-k">&lt;-</span> <span class="pl-s"><span class="pl-pds">"</span>http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv<span class="pl-pds">"</span></span>
+<span class="pl-smi">training</span> <span class="pl-k">&lt;-</span> read.csv(url(<span class="pl-smi">trainUrl</span>), <span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span>#DIV/0!<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>))
+<span class="pl-smi">validation</span> <span class="pl-k">&lt;-</span> read.csv(url(<span class="pl-smi">validationUrl</span>), <span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span>#DIV/0!<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>))
+dim(<span class="pl-smi">training</span>)
+dim(<span class="pl-smi">validation</span>)</pre></div>
+
+<h1>
+<a id="split-training-dataset-into-two" class="anchor" href="#split-training-dataset-into-two" aria-hidden="true"><span class="octicon octicon-link"></span></a>Split training dataset into two</h1>
+
+<p>The testing set will be the final set that we predict into, and so we will use it as a validation set (called validation). For this reason, we will split the training dataset into two, for training and testing the model we built. This will allow us to investigate the out of sample error rate of the model before we do the final prediction into the validation sets.  The training data is split into 70% training and 30% testing. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">inTrain</span> <span class="pl-k">&lt;-</span> createDataPartition(<span class="pl-v">y</span><span class="pl-k">=</span><span class="pl-smi">training</span><span class="pl-k">$</span><span class="pl-smi">classe</span>, <span class="pl-v">p</span><span class="pl-k">=</span><span class="pl-c1">0.7</span>, <span class="pl-v">list</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>)
+<span class="pl-smi">training1</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training</span>[<span class="pl-smi">inTrain</span>, ]
+<span class="pl-smi">testing</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training</span>[<span class="pl-k">-</span><span class="pl-smi">inTrain</span>, ]
+dim(<span class="pl-smi">training1</span>) 
+dim(<span class="pl-smi">testing</span>)</pre></div>
+
+<h1>
+<a id="clean-the-data" class="anchor" href="#clean-the-data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Clean the data</h1>
+
+<p>Assess the data for the amount of missing (NA) values. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-v">na_test</span> <span class="pl-k">=</span> sapply(<span class="pl-smi">training1</span>, <span class="pl-k">function</span>(<span class="pl-smi">x</span>) {sum(is.na(<span class="pl-smi">x</span>))})
+table(<span class="pl-smi">na_test</span>)</pre></div>
+
+<p>There are numerous variables without and missing, and then a lot of variables with almost all the data missing. Remove all variables with missing data, and just use the variables we have complete data on to build the model. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-v">bad_columns</span> <span class="pl-k">=</span> names(<span class="pl-smi">na_test</span>[<span class="pl-smi">na_test</span><span class="pl-k">!=</span><span class="pl-c1">0</span>])
+<span class="pl-v">training1</span> <span class="pl-k">=</span> <span class="pl-smi">training1</span>[, <span class="pl-k">!</span>names(<span class="pl-smi">training1</span>) <span class="pl-k">%in%</span> <span class="pl-smi">bad_columns</span>]
+str(<span class="pl-smi">training1</span>)
+dim(<span class="pl-smi">training1</span>)</pre></div>
+
+<p>Remove the first seven columns of data. This information is about the person, time and other information that is not related to the movement. So remove these columns as they are not going to be used in the model.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-v">training1</span> <span class="pl-k">=</span> <span class="pl-smi">training1</span>[,<span class="pl-k">-</span>c(<span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-c1">7</span>)]</pre></div>
+
+<p>Check the data for variables that may have near zero variance. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">nzv_data</span> <span class="pl-k">&lt;-</span> nearZeroVar(<span class="pl-smi">training1</span>, <span class="pl-v">saveMetrics</span> <span class="pl-k">=</span> <span class="pl-c1">TRUE</span>)
+dim(<span class="pl-smi">nzv_data</span>)
+<span class="pl-smi">nzv_data</span></pre></div>
+
+<p>None of the remaining variables have near zero variance, so there is no need to remove variables for this reason. Our training dataset is now clean and ready to be used in model buliding. </p>
+
+<h1>
+<a id="build-model-using-rpart" class="anchor" href="#build-model-using-rpart" aria-hidden="true"><span class="octicon octicon-link"></span></a>Build model using RPART</h1>
+
+<p>Builiding a prediction model using recursive partitioning for classification algorithm (rpart).</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">modelRPART</span> <span class="pl-k">&lt;-</span> rpart(<span class="pl-smi">classe</span> <span class="pl-k">~</span> ., <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">training1</span>, <span class="pl-v">method</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>class<span class="pl-pds">"</span></span>)</pre></div>
+
+<p>Predict into the testing dataset and see how well we are classifying movements in the new dataset. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">predictions</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-smi">modelRPART</span>, <span class="pl-smi">testing</span>, <span class="pl-v">type</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>class<span class="pl-pds">"</span></span>)
+confusionMatrix(<span class="pl-smi">predictions</span>, <span class="pl-smi">testing</span><span class="pl-k">$</span><span class="pl-smi">classe</span>)</pre></div>
+
+<p>The out-sample accuracy of the model is 71%, making the out-sample error rate 29%, which is high, and could be lower. Let's try out a different algorithm and see if the out-sample error rate can be reduced. </p>
+
+<h1>
+<a id="build-model-using-randomforest" class="anchor" href="#build-model-using-randomforest" aria-hidden="true"><span class="octicon octicon-link"></span></a>Build model using RandomForest</h1>
+
+<p>Second attempt will use the random forest algortihm to build the model. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">modelRF</span> <span class="pl-k">&lt;-</span> randomForest(<span class="pl-smi">classe</span> <span class="pl-k">~</span>. , <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">training1</span>)</pre></div>
+
+<p>Predict into the testing dataset and see how well we are classifying movements in the new dataset.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">predictionsRF</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-smi">modelRF</span>, <span class="pl-smi">testing</span>, <span class="pl-v">type</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>class<span class="pl-pds">"</span></span>)
+confusionMatrix(<span class="pl-smi">predictionsRF</span>, <span class="pl-smi">testing</span><span class="pl-k">$</span><span class="pl-smi">classe</span>)</pre></div>
+
+<p>The out-sample accuracy of the model is 99.52%, making the out-sample error rate 0.48%, which implies the sample is doing really well in classifying the data. This model is performing much better than the previous one. We will use this model for predicting into the validation set. </p>
+
+<h1>
+<a id="validation-prediction" class="anchor" href="#validation-prediction" aria-hidden="true"><span class="octicon octicon-link"></span></a>Validation Prediction</h1>
+
+<p>In the final step, the validation data and the randomforest model will be used to predict movements. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">predictions_final</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-smi">modelRF</span>, <span class="pl-smi">validation</span>, <span class="pl-v">type</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>class<span class="pl-pds">"</span></span>)</pre></div>
+
+<p>The code below uploads the information to Coursera</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-v">pml_write_files</span> <span class="pl-k">=</span> <span class="pl-k">function</span>(<span class="pl-smi">x</span>){
+  <span class="pl-v">n</span> <span class="pl-k">=</span> length(<span class="pl-smi">x</span>)
+  <span class="pl-k">for</span>(<span class="pl-smi">i</span> <span class="pl-k">in</span> <span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-smi">n</span>){
+    <span class="pl-v">filename</span> <span class="pl-k">=</span> paste0(<span class="pl-s"><span class="pl-pds">"</span>problem_id_<span class="pl-pds">"</span></span>,<span class="pl-smi">i</span>,<span class="pl-s"><span class="pl-pds">"</span>.txt<span class="pl-pds">"</span></span>)
+    write.table(<span class="pl-smi">x</span>[<span class="pl-smi">i</span>],<span class="pl-v">file</span><span class="pl-k">=</span><span class="pl-smi">filename</span>,<span class="pl-v">quote</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>,<span class="pl-v">row.names</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>,<span class="pl-v">col.names</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>)
+  }
+}
+
+pml_write_files(<span class="pl-smi">predictions_final</span>)</pre></div>
+        </section>
+
+        <footer>
+          Cousera machine learning project is maintained by <a href="https://github.com/ktansey">ktansey</a><br>
+          This page was generated by <a href="https://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
+
+        
+      </div>
+    </div>
+  </body>
+</html>
